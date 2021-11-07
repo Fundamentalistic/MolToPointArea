@@ -3,7 +3,7 @@ import os
 import torch
 from PDB import PDB
 
-path = "D:\\Water\\result3.pdb"
+path = "/home/main/Water/result3.pdb"
 pdb = PDB(path)
 
 water = pdb.getWater()
