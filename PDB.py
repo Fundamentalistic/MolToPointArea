@@ -1,4 +1,6 @@
 import os
+import json
+import numpy
 
 HYDROPHOBIC = 0
 CHARGED = 1
@@ -6,8 +8,9 @@ POLAR = 2
 SPECIAL = 3
 PROLINE = 4
 
-def roundBy(val, base):
-    return (val // base)*base
+
+def round_by(val, base):
+    return (val // base) * base
 
 class Resolve_Dicts:
     types = {
@@ -150,6 +153,14 @@ class PDB:
     alphaTraceLen = 0
     waterProbabilityNetwork = []
     test = {}
+    hyperSpacesJSON = {}
+
+    axis_step = None
+    long_axis = None
+    long_axis_shift = None
+    middle_axis = None
+    little_axis = None
+    hyper_spaces_data = None
 
     minX = 0
     maxX = 0
@@ -158,11 +169,52 @@ class PDB:
     minZ = 0
     maxZ = 0
 
-    def __init__(self, path):
+    in_cube_step = 1
+
+    def __init__(self, path, in_cube_step=0.1):
+        self.in_cube_step = in_cube_step
         file = open(path, 'r')
         self.content = file.readlines()
         file.close()
         self.__parse_content()
+
+    def read_hyperspaces_configuration_file(self, path):
+        config_file = open(path, 'r')
+        self.hyperSpacesJSON = json.loads(config_file.read())
+        pass
+
+    def produce_empty_sets_from_hyperspaces(self):
+        self.axis_step = self.hyperSpacesJSON['axisStep']
+        self.long_axis = self.hyperSpacesJSON['long_axis']
+        self.long_axis_shift = self.hyperSpacesJSON['long_axis_shift']
+        self.middle_axis = self.hyperSpacesJSON['middle_axis']
+        self.little_axis = self.hyperSpacesJSON['little_axis']
+        self.hyper_spaces_data = self.hyperSpacesJSON['data']
+        hyperspaces_count = len(self.hyper_spaces_data)
+
+        self.hyper_spaces = []
+
+        for index, hyperspace in enumerate(self.hyper_spaces_data):
+            max_long = hyperspace['max_long']
+            min_long = hyperspace['min_long']
+            max_middle = hyperspace['max_middle']
+            min_middle = hyperspace['min_middle']
+            max_little = hyperspace['max_little']
+            min_little = hyperspace['min_little']
+            long_in_cube_len = int((max_long - min_long) / self.in_cube_step)
+            middle_in_cube_len = int((max_middle - min_middle) / self.in_cube_step)
+            little_in_cube_len = int((max_little - min_little) / self.in_cube_step)
+            hypercube = numpy.full((long_in_cube_len, middle_in_cube_len, little_in_cube_len), 1, dtype=numpy.int8)
+            self.hyper_spaces.append({
+                'hypercube': hypercube,
+                'long_shift': min_long * -1,
+                'middle_shift': min_middle * -1,
+                'little_shift': min_little * -1,
+            })
+
+
+
+
 
     def __parse_content(self):
         self.AASequence = []
@@ -213,22 +265,42 @@ class PDB:
 
         self.alphaTraceLen = len(self.alphaTrace)
 
-    def getAlphaTrace(self):
+    def get_alpha_trace(self):
         return self.alphaTrace
 
-    def getWater(self):
+    def get_water(self):
         return self.water
 
-    def generateWaterProbabilityNetwork(self):
+    def generate_water_probability_network(self):
         for index, point in enumerate(self.waterPoints):
+
+            x = round_by(point[0], 1)
+            y = round_by(point[1], 1)
+            z = round_by(point[2], 1)
+            probe_point = [x, y, z]
+
+            coordinates = {
+                'x': x,
+                'y': y,
+                'z': z
+            }
+
+            long_coordinate = coordinates[self.long_axis]
+            middle_coordinate = coordinates[self.middle_axis]
+            little_coordinate = coordinates[self.little_axis]
+
+            hyper_cube_index = int((long_coordinate + self.long_axis_shift) // self.axis_step)
+
+            hypercube_long_coordinate = \
+                (long_coordinate + self.hyper_spaces[hyper_cube_index]['long_shift']) / self.in_cube_step
+            hypercube_middle_coordinate = \
+                middle_coordinate + self.hyper_spaces[hyper_cube_index]['middle_shift'] / self.in_cube_step
+            hypercube_little_coordinate = \
+                little_coordinate + self.hyper_spaces[hyper_cube_index]['little_shift'] / self.in_cube_step
 
             if index % 1000 == 0:
                 print(f"Index: {index} Len: {len(self.waterPoints)}")
-
-            x = roundBy(point[0] * 10, 1) / 10
-            y = roundBy(point[1] * 10, 1) / 10
-            z = roundBy(point[2] * 10, 1) / 10
-            probePoint = [x, y, z]
+                print(f"HyperCube index: {hyper_cube_index}")
 
             sx = str(x)
             sy = str(y)
@@ -238,14 +310,12 @@ class PDB:
                 self.test[sx][sy][sz] += 1
             except:
                 self.test[sx] = {sy: {sz: 1}}
-                self.waterProbabilityNetwork.append(probePoint)
+                self.waterProbabilityNetwork.append(probe_point)
 
-
-
-    def getWaterProbabilityNetwork(self):
+    def get_water_probability_network(self):
         return self.waterProbabilityNetwork
 
-    def generatePointsTCL(self):
+    def generate_points_tcl(self):
 
         tclScript = open('waterPoints.tcl', 'w+')
         for point in self.waterProbabilityNetwork:
