@@ -9,7 +9,7 @@ pdbFilePath = "/home/main/3rjp/frames/frames.pdb"
 configurationFilePath = "/home/main/Water/hyperspaces.json"
 regime = sys.argv[1]
 resultTclFilePath = sys.argv[2]
-NEAR_CONSTANT = 500
+NEAR_CONSTANT = 0
 
 max_x = maxPoint[0]
 max_y = maxPoint[1]
