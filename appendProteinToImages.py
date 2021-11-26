@@ -2,7 +2,6 @@ import numpy
 import os
 from PIL import Image
 
-
 minPoint = [-211.50100708007813, -224.50900268554688, 11.904999732971191]
 maxPoint = [31.152999877929688, 44.63100051879883, 110.29499816894531]
 stepOfSpace = 0.1
@@ -10,7 +9,6 @@ pdbFilePath = "D:\\3rjp\\frames\\frames.pdb"
 NEAR_CONSTANT = 500
 PROTEIN_ATOMS_LEN = 10000
 MAX_ATOM_TO_PLANE = 50
-FOLDER_TO_IMAGE_SAVING = 'img'
 
 max_x = maxPoint[0]
 max_y = maxPoint[1]
@@ -39,9 +37,6 @@ y_size = int(y_dif // stepOfSpace)
 z_size = int(z_dif // stepOfSpace)
 
 # Создаем дискретное пространство
-print("Initiate discrete space array")
-space = numpy.zeros((x_size + NEAR_CONSTANT, y_size + NEAR_CONSTANT, z_size + NEAR_CONSTANT), dtype=numpy.ubyte)
-print(x_size, y_size, z_size)
 print("Initiate protein sequence array")
 protein = numpy.zeros((PROTEIN_ATOMS_LEN, MAX_ATOM_TO_PLANE, 2), dtype=numpy.float)
 protein_cursors = numpy.zeros(PROTEIN_ATOMS_LEN, dtype=numpy.uint)
@@ -65,17 +60,19 @@ for ind, line in enumerate(pdbFile):
     if ind % 1000000 == 0:
         print(f"{ind} lines is read", end='\r')
     if record == "ATOM":
-        x = float(line[30:38])
-        y = float(line[38:46])
-        z = float(line[46:54])
 
         res_name = line[17:21].replace(" ", "")
 
-        x_d = x_to_descrete_x(x)
-        y_d = y_to_descrete_y(y)
-        z_d = z_to_descrete_z(z)
-
         if res_name != "TIP3" and not protein_is_read:
+
+            x = float(line[30:38])
+            y = float(line[38:46])
+            z = float(line[46:54])
+
+            x_d = x_to_descrete_x(x)
+            y_d = y_to_descrete_y(y)
+            z_d = z_to_descrete_z(z)
+
             protein[x_d][protein_cursors[x_d]][0] = y_d
             protein[x_d][protein_cursors[x_d]][1] = z_d
             protein_cursors[x_d] += 1
@@ -83,24 +80,16 @@ for ind, line in enumerate(pdbFile):
                 print("COORDINATE VOLUME MORE THEN MAX_ATOM_TO_PLANE")
                 quit()
 
-        space[x_d, y_d, z_d] = 1
     elif record.find("END") != -1:
         protein_is_read = True
-
-numpy.save(f'result.space.np', space)
+        break
 
 print("PDB file reading is complete. Images writing...")
-
-if not os.path.exists(FOLDER_TO_IMAGE_SAVING+'\\'):
-    os.makedirs(FOLDER_TO_IMAGE_SAVING+'\\')
-for i in range(x_size):
-    im = Image.fromarray(space[i]*255, 'L')
-    im.save(f'{FOLDER_TO_IMAGE_SAVING}\\{i}.png')
 
 for i in range(x_size):
     img = None
     try:
-        img = Image.open(f"img\\{i}.png")
+        img = Image.open(f"img/{i}.png")
     except:
         continue
     img1 = img.convert('RGB')
@@ -112,7 +101,7 @@ for i in range(x_size):
         rgbi.putpixel((x, y), (0, 255, 0))
         print(x, y)
     print(f"Saving image: {i}.png.", end=" ")
-    rgbi.save(f"{FOLDER_TO_IMAGE_SAVING}\\{i}.png")
+    rgbi.save(f"img/{i}.png")
     print("Complete")
 
-print("Complete!")
+print("Program complete!")
